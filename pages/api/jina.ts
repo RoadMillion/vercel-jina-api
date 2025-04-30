@@ -77,17 +77,29 @@ export default async function handler(
     // 发送 200 状态码和获取到的内容
     return res.status(200).send(content);
 
-  } catch (err: any) { // 捕获整个过程中的任何错误
+  } catch (err: unknown) { // 使用 unknown 替代 any
     // 9. 统一错误处理
-    if (err.name === 'AbortError') {
-        // 如果是超时错误
-        console.error('Fetch aborted due to timeout:', err);
-        return res.status(504).send('Gateway Timeout: The request to the Jina proxy timed out.');
+    let errorMessage = 'An unknown error occurred';
+    let errorStatus = 500;
+
+    if (err instanceof Error) { // 检查 err 是否为 Error 实例
+        errorMessage = err.message; // 安全地访问 message
+        if (err.name === 'AbortError') {
+            // 如果是超时错误
+            console.error('Fetch aborted due to timeout:', err);
+            errorMessage = 'Gateway Timeout: The request to the Jina proxy timed out.';
+            errorStatus = 504; // 设置状态码为 504
+        } else {
+            // 其他类型的 Error
+            console.error('An unexpected error occurred:', err);
+            errorMessage = 'Internal Server Error: ' + err.message;
+        }
     } else {
-        // 其他类型的错误
-        console.error('An unexpected error occurred:', err);
-        // 返回 500 服务器内部错误
-        return res.status(500).send('Internal Server Error: ' + err.message);
+        // 如果 err 不是 Error 实例，记录原始错误信息
+        console.error('An unexpected non-Error type was caught:', err);
     }
+
+    // 返回错误状态和信息
+    return res.status(errorStatus).send(errorMessage);
   }
 }
